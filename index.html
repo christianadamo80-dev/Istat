@@ -14,6 +14,7 @@
             align-items: center;
             min-height: 100vh;
             margin: 0;
+            padding: 20px;
         }
         .container {
             background: white;
@@ -21,9 +22,10 @@
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.05);
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
         }
-        h1 { font-size: 20px; text-align: center; color: #1a365d; margin-bottom: 25px; }
+        h1 { font-size: 22px; text-align: center; color: #1a365d; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #718096; font-size: 14px; margin-bottom: 25px; }
         .form-group { margin-bottom: 18px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 14px; }
         input, select {
@@ -33,7 +35,10 @@
             border-radius: 6px;
             box-sizing: border-box;
             font-size: 16px;
+            background-color: #fff;
         }
+        .row { display: flex; gap: 10px; }
+        .row .form-group { flex: 1; }
         .result-box {
             background-color: #f8fafc;
             border-left: 4px solid #3182ce;
@@ -44,12 +49,14 @@
         .result-item { display: flex; justify-content: space-between; margin-bottom: 10px; }
         .result-item:last-child { margin-bottom: 0; font-weight: bold; border-top: 1px solid #e2e8f0; padding-top: 10px; }
         .highlight { color: #2b6cb0; font-size: 18px; }
+        .info-tasso { font-size: 13px; color: #4a5568; margin-top: 10px; font-style: italic; text-align: center;}
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>Calcolo Adeguamento ISTAT</h1>
+    <div class="subtitle">Aggiornato con i tassi ufficiali FOI</div>
     
     <div class="form-group">
         <label for="importo">Importo Assegno Attuale (€)</label>
@@ -60,39 +67,92 @@
         <label for="rivalutazione">Percentuale di Rivalutazione</label>
         <select id="rivalutazione" onchange="calcola()">
             <option value="100">100% (Standard)</option>
-            <option value="75">75% (Spesso usato in separazioni)</option>
+            <option value="75">75% (Ridotta)</option>
         </select>
     </div>
-    
-    <div class="form-group">
-        <label for="tasso">Tasso di variazione ISTAT (%)</label>
-        <input type="number" id="tasso" value="1.2" step="0.1" oninput="calcola()">
+
+    <div class="row">
+        <div class="form-group">
+            <label for="anno">Anno Rinnovo</label>
+            <select id="anno" onchange="calcola()">
+                <option value="2025">2025 (su dati 2024)</option>
+                <option value="2026" selected>2026 (su dati 2025)</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="mese">Mese di Scadenza</label>
+            <select id="mese" onchange="calcola()">
+                <option value="0">Gennaio</option>
+                <option value="1">Febbraio</option>
+                <option value="2">Marzo</option>
+                <option value="3">Aprile</option>
+                <option value="4">Maggio</option>
+                <option value="5">Giugno</option>
+                <option value="6">Luglio</option>
+                <option value="7">Agosto</option>
+                <option value="8">Settembre</option>
+                <option value="9">Ottobre</option>
+                <option value="10">Novembre</option>
+                <option value="11">Dicembre</option>
+            </select>
+        </div>
     </div>
     
     <div class="result-box">
         <div class="result-item">
+            <span>Tasso Applicato:</span>
+            <span id="res-tasso" style="font-weight: normal;">0,0 %</span>
+        </div>
+        <div class="result-item">
             <span>Quota Incremento:</span>
-            <span id="res-incremento" class="highlight">€ 6,00</span>
+            <span id="res-incremento" class="highlight">€ 0,00</span>
         </div>
         <div class="result-item">
             <span>Nuovo Assegno:</span>
-            <span id="res-totale" class="highlight" style="color: #2f855a;">€ 506,00</span>
+            <span id="res-totale" class="highlight" style="color: #2f855a;">€ 0,00</span>
         </div>
+    </div>
+    
+    <div class="info-tasso" id="info-tasso">
+        Rivalutazione calcolata sulla variazione FOI rispetto allo stesso mese dell'anno precedente.
     </div>
 </div>
 
 <script>
+// Database interno dei tassi di variazione annuale FOI (Nazionali, senza tabacchi)
+// Struttura: array di 12 mesi (da Gennaio a Dicembre)
+const datiIstat = {
+    // Tassi variazione FOI del 2025 (rispetto ai mesi del 2024) - Utili per i rinnovi nel 2026
+    "2026": [0.8, 0.7, 1.1, 0.8, 0.8, 0.8, 1.2, 1.0, 0.7, 0.9, 1.4, 1.2],
+    
+    // Tassi variazione FOI del 2024 (rispetto ai mesi del 2023) - Utili per i rinnovi nel 2025
+    "2025": [0.8, 0.7, 1.2, 0.9, 0.8, 0.8, 1.3, 1.1, 0.7, 0.9, 1.5, 1.5]
+};
+
 function calcola() {
     const importo = parseFloat(document.getElementById('importo').value) || 0;
     const rivalutazione = parseFloat(document.getElementById('rivalutazione').value) / 100;
-    const tasso = parseFloat(document.getElementById('tasso').value) || 0;
+    const anno = document.getElementById('anno').value;
+    const mese = parseInt(document.getElementById('mese').value);
     
+    // Recupera il tasso dall'archivio in base all'anno selezionato
+    const tasso = datiIstat[anno][mese];
+    
+    // Calcolo dell'incremento applicando la percentuale (es. 100% o 75%)
     const incremento = importo * (tasso / 100) * rivalutazione;
     const nuovoImporto = importo + incremento;
     
+    // Mostra i risultati formattati
+    document.getElementById('res-tasso').innerText = tasso.toLocaleString('it-IT') + ' %';
     document.getElementById('res-incremento').innerText = '€ ' + incremento.toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     document.getElementById('res-totale').innerText = '€ ' + nuovoImporto.toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    
+    // Testo esplicativo dinamico
+    const annoPrecedente = parseInt(anno) - 1;
+    document.getElementById('info-tasso').innerText = `Rivalutazione per il rinnovo ${anno} basata sulla variazione dell'indice FOI di quel mese rispetto al ${annoPrecedente}.`;
 }
+
 // Esegui il calcolo iniziale all'avvio
 calcola();
 </script>
